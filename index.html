@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Auditoría de Inventario</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #00e5a0;
+    --accent2: #0099ff;
+    --warn: #ff6b35;
+    --danger: #ff3366;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --success-bg: #00e5a020;
+    --warn-bg: #ff6b3520;
+    --danger-bg: #ff336620;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', 'Lucida Console', monospace;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo-icon { font-size: 18px; }
+  .status-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 11px;
+  }
+  .stat-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat-pill .num { color: var(--accent); font-weight: 700; }
+  .stat-pill.warn .num { color: var(--warn); }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* PANELS */
+  .panel { display: none; padding: 16px; }
+  .panel.active { display: block; }
+
+  /* UPLOAD PANEL */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:active { border-color: var(--accent); background: var(--success-bg); }
+  .upload-icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px; letter-spacing: 2px; }
+  .upload-sub { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  #fileInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .col-mapper {
+    margin-top: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .col-mapper h3 { font-size: 11px; letter-spacing: 2px; color: var(--accent); margin-bottom: 12px; text-transform: uppercase; }
+  .col-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .col-label { font-size: 11px; color: var(--muted); width: 90px; flex-shrink: 0; }
+  select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    flex: 1;
+    outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 12px;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:active { opacity: 0.8; transform: scale(0.98); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+  .preview-table {
+    margin-top: 12px;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: var(--surface2); padding: 8px; text-align: left; color: var(--accent); font-weight: 700; letter-spacing: 1px; position: sticky; top: 0; }
+  td { padding: 7px 8px; border-top: 1px solid var(--border); color: var(--text); }
+  tr:nth-child(even) td { background: #ffffff05; }
+
+  /* SCANNER PANEL */
+  .scanner-wrap {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+    border: 1px solid var(--border);
+  }
+  #scanner-container { width: 100%; height: 100%; }
+  #scanner-container video { width: 100%; height: 100%; object-fit: cover; }
+  #scanner-container canvas { position: absolute !important; top: 0; left: 0; width: 100% !important; height: 100% !important; }
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .scan-frame {
+    width: 70%;
+    height: 40%;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    position: relative;
+    box-shadow: 0 0 0 1000px rgba(0,0,0,0.4);
+  }
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: scanAnim 2s ease-in-out infinite;
+  }
+  @keyframes scanAnim {
+    0% { top: 5%; }
+    50% { top: 90%; }
+    100% { top: 5%; }
+  }
+  .scan-corner {
+    position: absolute;
+    width: 16px; height: 16px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  .scan-corner.tl { top: -1px; left: -1px; border-width: 3px 0 0 3px; }
+  .scan-corner.tr { top: -1px; right: -1px; border-width: 3px 3px 0 0; }
+  .scan-corner.bl { bottom: -1px; left: -1px; border-width: 0 0 3px 3px; }
+  .scan-corner.br { bottom: -1px; right: -1px; border-width: 0 3px 3px 0; }
+
+  .scanner-inactive {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: var(--surface2);
+  }
+  .scanner-inactive-icon { font-size: 56px; }
+  .scanner-inactive-text { font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+
+  .last-scan {
+    margin-top: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    min-height: 70px;
+    transition: all 0.3s;
+  }
+  .last-scan.found { border-color: var(--accent); background: var(--success-bg); }
+  .last-scan.notfound { border-color: var(--danger); background: var(--danger-bg); }
+  .last-scan.duplicate { border-color: var(--warn); background: var(--warn-bg); }
+  .scan-result-label { font-size: 10px; letter-spacing: 2px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  .scan-result-code { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+  .scan-result-name { font-size: 13px; color: var(--text); margin-top: 2px; }
+  .scan-result-status { font-size: 11px; margin-top: 6px; font-weight: 700; letter-spacing: 1px; }
+  .scan-result-status.ok { color: var(--accent); }
+  .scan-result-status.err { color: var(--danger); }
+  .scan-result-status.dup { color: var(--warn); }
+
+  /* Manual input */
+  .manual-row { display: flex; gap: 8px; margin-top: 12px; }
+  .input-text {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+  .input-text:focus { border-color: var(--accent); }
+  .btn-scan-manual {
+    background: var(--accent2);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+
+  .progress-bar-wrap {
+    background: var(--surface2);
+    border-radius: 20px;
+    height: 8px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 20px;
+    transition: width 0.4s ease;
+  }
+  .progress-label { font-size: 11px; color: var(--muted); margin-top: 6px; text-align: right; }
+
+  /* LIST PANEL */
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-btn {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .filter-btn.warn.active { background: var(--warn); color: #000; border-color: var(--warn); }
+  .filter-btn.danger.active { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  .product-list { display: flex; flex-direction: column; gap: 6px; }
+  .product-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .product-card:active { transform: scale(0.99); }
+  .product-card.scanned { border-color: var(--accent); }
+  .product-card.pending { border-color: var(--border); }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.scanned { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.pending { background: var(--muted); }
+  .product-info { flex: 1; min-width: 0; }
+  .product-code { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .product-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-count { font-size: 11px; text-align: right; flex-shrink: 0; }
+  .product-count span { color: var(--accent); font-weight: 700; }
+  .product-count.pending span { color: var(--warn); }
+  .search-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 10px;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* REPORT PANEL */
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .report-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .report-card .big { font-size: 32px; font-weight: 700; }
+  .report-card .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+  .report-card.ok .big { color: var(--accent); }
+  .report-card.warn .big { color: var(--warn); }
+  .report-card.danger .big { color: var(--danger); }
+  .report-card.info .big { color: var(--accent2); }
+
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+
+  .export-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 10px;
+  }
+  .export-btn:active { background: var(--success-bg); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 10px 20px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    z-index: 999;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  .cam-btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .cam-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .cam-btn.start { background: var(--accent); color: #000; }
+  .cam-btn.stop { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .cam-btn:active { opacity: 0.8; transform: scale(0.98); }
+
+  .qty-input {
+    width: 60px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: center;
+    outline: none;
+  }
+
+  .no-data-banner {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin: 20px 0;
+  }
+  .no-data-banner p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .no-data-banner strong { color: var(--accent); }
+
+  .gondola-select-wrap { margin-bottom: 12px; }
+  .gondola-label { font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; display: block; }
+
+  /* TRIGGER BUTTON */
+  .trigger-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 14px 0 6px;
+  }
+  .trigger-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    background: var(--success-bg);
+    color: var(--accent);
+    font-size: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 0 20px var(--accent)40;
+    position: relative;
+  }
+  .trigger-btn:active, .trigger-btn.firing {
+    transform: scale(0.88);
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 0 30px var(--accent);
+  }
+  .trigger-btn.disabled {
+    border-color: var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .trigger-label {
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* QTY STEPPER in list */
+  .qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .qty-btn:active { background: var(--accent); color: #000; border-color: var(--accent); transform: scale(0.92); }
+  .qty-num {
+    min-width: 28px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .qty-total { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <span class="logo-icon">📦</span>
+    AUDIT
+  </div>
+  <div class="status-bar">
+    <div class="stat-pill">
+      <span class="num" id="hdr-scanned">0</span>/<span id="hdr-total">0</span>
+    </div>
+    <div class="stat-pill warn">
+      <span class="num" id="hdr-pending">0</span> pendiente
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('upload')">📂 Excel</div>
+  <div class="tab" onclick="showTab('scanner')">📷 Escáner</div>
+  <div class="tab" onclick="showTab('list')">📋 Lista</div>
+  <div class="tab" onclick="showTab('report')">📊 Reporte</div>
+</div>
+
+<!-- UPLOAD -->
+<div class="panel active" id="tab-upload">
+  <div class="upload-zone" id="dropZone">
+    <div class="upload-icon">📊</div>
+    <div class="upload-title">Subir Excel</div>
+    <div class="upload-sub">Toca para seleccionar tu archivo<br>.xlsx · .xls · .csv</div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+  </div>
+
+  <div class="col-mapper" id="colMapper" style="display:none">
+    <h3>⚙ Mapear columnas</h3>
+    <div class="col-row">
+      <span class="col-label">Código barra</span>
+      <select id="colBarcode"><option value="">— ninguna —</option></select>
+    </div>
+    <div class="col-row">
+      <span class="col-label">Cód. interno</span>
+      <select id="colCode"><option value="">— ninguna —</option></select>
+    </div>
+    <div class="col-row">
+      <span class="col-label">Nombre</span>
+      <select id="colName"><option value="">— ninguna —</option></select>
+    </div>
+    <div class="col-row">
+      <span class="col-label">Cantidad</span>
+      <select id="colQty"><option value="">— ninguna —</option></select>
+    </div>
+    <div class="col-row">
+      <span class="col-label">Ubicación</span>
+      <select id="colLoc"><option value="">— ninguna —</option></select>
+    </div>
+    <button class="btn btn-primary" onclick="loadInventory()">✓ Cargar inventario</button>
+  </div>
+
+  <div class="preview-table" id="previewTable" style="display:none"></div>
+
+  <div id="uploadSuccess" style="display:none">
+    <div style="margin-top:16px; background:var(--success-bg); border:1px solid var(--accent); border-radius:10px; padding:16px; text-align:center;">
+      <div style="font-size:32px; margin-bottom:8px;">✅</div>
+      <div style="font-weight:700; color:var(--accent); letter-spacing:1px;" id="uploadSuccessText"></div>
+      <button class="btn btn-secondary" onclick="resetInventory()" style="margin-top:12px;">Cargar otro archivo</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div class="panel" id="tab-scanner">
+  <div id="noDataScanner" class="no-data-banner" style="display:none">
+    <div style="font-size:36px; margin-bottom:8px;">📂</div>
+    <p>Primero <strong>carga tu Excel</strong> en la pestaña de inicio para poder auditar productos.</p>
+  </div>
+
+  <div id="scannerContent">
+    <div class="gondola-select-wrap" id="gondolaWrap">
+      <label class="gondola-label">Gandola / Isla actual</label>
+      <div class="manual-row" style="margin-top:0">
+        <input class="input-text" id="gondolaInput" placeholder="Ej: Gandola A1, Isla 3..." style="font-size:12px;">
+      </div>
+    </div>
+
+    <div class="scanner-wrap" id="scannerWrap">
+      <video id="scanVideo" style="width:100%;height:100%;object-fit:cover;display:none;" playsinline muted></video>
+      <canvas id="scanCanvas" style="display:none;"></canvas>
+      <div class="scanner-inactive" id="scannerInactive">
+        <div class="scanner-inactive-icon">📷</div>
+        <div class="scanner-inactive-text">Cámara inactiva</div>
+      </div>
+      <div class="scan-overlay" id="scanOverlay" style="display:none">
+        <div class="scan-frame">
+          <div class="scan-corner tl"></div>
+          <div class="scan-corner tr"></div>
+          <div class="scan-corner bl"></div>
+          <div class="scan-corner br"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fallback: foto desde cámara nativa -->
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="processPhoto(this)">
+
+    <div class="cam-btn-row">
+      <button class="cam-btn start" id="btnStart" onclick="startScanner()">▶ Iniciar cámara</button>
+      <button class="cam-btn stop" id="btnStop" onclick="stopScanner()" style="display:none">■ Detener</button>
+      <button class="cam-btn start" id="btnPhoto" onclick="document.getElementById('photoInput').click()" style="background:var(--accent2);color:#fff;display:none;">📸 Foto</button>
+    </div>
+
+    <div class="last-scan" id="lastScan">
+      <div class="scan-result-label">Último escaneo</div>
+      <div style="color:var(--muted); font-size:12px; margin-top:4px;">Escanea un código de barras...</div>
+    </div>
+
+    <!-- TRIGGER BUTTON -->
+    <div class="trigger-wrap">
+      <div class="trigger-btn disabled" id="triggerBtn"
+           ontouchstart="triggerPress()" ontouchend="triggerRelease()"
+           onmousedown="triggerPress()" onmouseup="triggerRelease()">
+        🔫
+      </div>
+    </div>
+    <div class="trigger-label" id="triggerLabel">Inicia la cámara primero</div>
+
+    <div class="manual-row">
+      <input class="input-text" id="manualCode" placeholder="Ingresar código manualmente..." onkeydown="if(event.key==='Enter') manualSearch()">
+      <button class="btn-scan-manual" onclick="manualSearch()">→</button>
+    </div>
+
+    <div class="progress-bar-wrap" style="margin-top:16px;">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+    <div class="progress-label" id="progressLabel">0 / 0 productos auditados</div>
+  </div>
+</div>
+
+<!-- LIST -->
+<div class="panel" id="tab-list">
+  <div id="noDataList" class="no-data-banner" style="display:none">
+    <div style="font-size:36px; margin-bottom:8px;">📂</div>
+    <p>Carga tu <strong>Excel</strong> primero para ver el inventario.</p>
+  </div>
+  <div id="listContent">
+    <input class="search-input" id="searchInput" placeholder="🔍 Buscar por nombre o código..." oninput="renderList()">
+    <div class="filter-row">
+      <button class="filter-btn active" id="fAll" onclick="setFilter('all')">Todos</button>
+      <button class="filter-btn danger" id="fPending" onclick="setFilter('pending')">Pendientes</button>
+      <button class="filter-btn" id="fScanned" onclick="setFilter('scanned')">Auditados</button>
+    </div>
+    <div class="product-list" id="productList"></div>
+  </div>
+</div>
+
+<!-- REPORT -->
+<div class="panel" id="tab-report">
+  <div id="noDataReport" class="no-data-banner" style="display:none">
+    <div style="font-size:36px; margin-bottom:8px;">📊</div>
+    <p>Audita tu inventario primero para ver el reporte.</p>
+  </div>
+  <div id="reportContent" style="display:none">
+    <div class="report-grid">
+      <div class="report-card info">
+        <div class="big" id="rTotal">0</div>
+        <div class="label">Total productos</div>
+      </div>
+      <div class="report-card ok">
+        <div class="big" id="rScanned">0</div>
+        <div class="label">Auditados</div>
+      </div>
+      <div class="report-card danger">
+        <div class="big" id="rPending">0</div>
+        <div class="label">Pendientes</div>
+      </div>
+      <div class="report-card warn">
+        <div class="big" id="rPercent">0%</div>
+        <div class="label">Completado</div>
+      </div>
+    </div>
+
+    <div class="section-title">📍 Por ubicación</div>
+    <div id="locationBreakdown" class="product-list"></div>
+
+    <div class="section-title" id="pendingTitle">⚠ Productos pendientes</div>
+    <div id="pendingList" class="product-list"></div>
+
+    <button class="export-btn" onclick="exportReport()">↓ Exportar reporte Excel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let rawData = [];
+let inventory = {}; // key: canonical id → {barcode, code, name, qty, location, scanned, scannedQty, gondola}
+let headers = [];
+let activeFilter = 'all';
+let scannerRunning = false;
+let lastCode = '';
+let lastCodeTime = 0;
+
+// ── PERSISTENCIA localStorage ──────────────────────────────────
+const LS_KEY = 'audit_inventory_v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(inventory));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (!saved) return false;
+    inventory = JSON.parse(saved);
+    const count = Object.keys(inventory).length;
+    if (count === 0) return false;
+    // Restore UI
+    document.getElementById('dropZone').style.display = 'none';
+    document.getElementById('colMapper').style.display = 'none';
+    document.getElementById('previewTable').style.display = 'none';
+    document.getElementById('uploadSuccess').style.display = '';
+    const scanned = Object.values(inventory).filter(v => v.scanned).length;
+    document.getElementById('uploadSuccessText').textContent =
+      `${count} productos · ${scanned} auditados (sesión restaurada)`;
+    updateHeader();
+    showToast(`✓ Sesión restaurada — ${count} productos`, 'success');
+    return true;
+  } catch(e) { return false; }
+}
+
+function clearState() {
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+}
+
+// TAB NAV
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tabs = ['upload','scanner','list','report'];
+  document.querySelectorAll('.tab')[tabs.indexOf(tab)].classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+  if (tab === 'list') renderList();
+  if (tab === 'report') renderReport();
+  if (tab === 'scanner') checkScannerData();
+}
+
+function checkScannerData() {
+  const hasData = Object.keys(inventory).length > 0;
+  document.getElementById('noDataScanner').style.display = hasData ? 'none' : '';
+  document.getElementById('scannerContent').style.display = hasData ? '' : 'none';
+}
+
+// FILE UPLOAD
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  readFile(file);
+});
+
+// Column keyword patterns
+const COL_PATTERNS = {
+  barcode:  /barr|ean|upc|c.digo\s*(barr|barra)|idd/i,
+  code:     /^c.d(igo)?$|^id$|ref|sku|intern/i,
+  name:     /nom|desc|product|articulo|artículo|artículo|denominac/i,
+  qty:      /cant|qty|exist|stock/i,
+  location: /ubic|gandola|isla|loc|pasillo|área|area/i,
+  price:    /p\.\s*venta|pventa|precio\s*venta/i,
+  cost:     /p\.\s*cost|costo/i,
+  status:   /stock$/i
+};
+
+function findHeaderRow(data) {
+  // Look for the row with the most non-empty cells that contains keyword matches
+  let bestRow = 0, bestScore = 0;
+  for (let i = 0; i < Math.min(data.length, 15); i++) {
+    const row = data[i].map(String);
+    const nonEmpty = row.filter(c => c.trim() !== '').length;
+    const keywordHits = row.filter(c => {
+      const cl = c.toLowerCase();
+      return /cod|nom|desc|cant|ubic|id|ean|upc|barr|stock|precio|venta|área|area|denominac/i.test(cl);
+    }).length;
+    const score = nonEmpty + keywordHits * 3;
+    if (score > bestScore && nonEmpty >= 3) { bestScore = score; bestRow = i; }
+  }
+  return bestRow;
+}
+
+function autoDetectCols(hdrs) {
+  const detected = { barcode: '', code: '', name: '', qty: '', location: '', cost: '', price: '' };
+  hdrs.forEach((h, i) => {
+    const hs = String(h).trim();
+    if (!hs) return;
+    if (COL_PATTERNS.barcode.test(hs) && detected.barcode === '') detected.barcode = i;
+    else if (COL_PATTERNS.code.test(hs) && detected.code === '') detected.code = i;
+    if (COL_PATTERNS.name.test(hs) && detected.name === '') detected.name = i;
+    if (COL_PATTERNS.qty.test(hs) && detected.qty === '') detected.qty = i;
+    if (COL_PATTERNS.location.test(hs) && detected.location === '') detected.location = i;
+    if (COL_PATTERNS.cost.test(hs) && detected.cost === '') detected.cost = i;
+    if (COL_PATTERNS.price.test(hs) && detected.price === '') detected.price = i;
+  });
+  hdrs.forEach((h, i) => {
+    const hs = String(h).trim().toLowerCase();
+    if (hs === 'idd' && detected.barcode === '') detected.barcode = i;
+    if (hs === 'id' && detected.code === '') detected.code = i;
+    if ((hs === 'código' || hs === 'codigo') && detected.barcode === '') detected.barcode = i;
+    if ((hs === 'p. costo' || hs === 'p.costo' || hs === 'costo') && detected.cost === '') detected.cost = i;
+    if ((hs === 'p. venta' || hs === 'p.venta' || hs === 'precio venta') && detected.price === '') detected.price = i;
+  });
+  return detected;
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let data;
+      if (file.name.endsWith('.csv')) {
+        const text = new TextDecoder('utf-8').decode(e.target.result);
+        const wb = XLSX.read(text, {type: 'string'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      } else {
+        const wb = XLSX.read(e.target.result, {type: 'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      }
+      if (data.length < 2) { showToast('El archivo parece vacío', 'error'); return; }
+
+      // Auto-detect header row (handles files where headers are on row 6+)
+      const headerRowIdx = findHeaderRow(data);
+      headers = data[headerRowIdx].map(String);
+      rawData = data.slice(headerRowIdx + 1).filter(r => r.some(c => c !== ''));
+
+      const detected = autoDetectCols(headers);
+
+      // If we detected enough columns, auto-load directly
+      if (detected.name !== '' || detected.barcode !== '' || detected.code !== '') {
+        showAutoDetectBanner(detected);
+        autoLoadInventory(detected);
+      } else {
+        // Fallback: show manual mapper
+        showColMapper(detected);
+        showPreview([data[headerRowIdx], ...data.slice(headerRowIdx+1, headerRowIdx+5)]);
+      }
+    } catch(err) {
+      console.error(err);
+      showToast('Error leyendo archivo', 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showAutoDetectBanner(det) {
+  const fieldNames = { barcode:'Cód. barra', code:'Cód. interno', name:'Nombre', qty:'Cantidad', location:'Ubicación' };
+  const lines = Object.entries(det)
+    .filter(([,v]) => v !== '')
+    .map(([k,v]) => `<span style="color:var(--accent)">✓</span> <b>${fieldNames[k]}</b>: ${headers[v]}`)
+    .join('<br>');
+  document.getElementById('colMapper').style.display = '';
+  document.getElementById('colMapper').innerHTML = `
+    <h3>⚡ Detección automática</h3>
+    <div style="font-size:12px; line-height:1.9; margin-bottom:10px;">${lines}</div>
+    <div style="font-size:11px; color:var(--muted)">Se detectaron ${rawData.length} filas de datos</div>
+  `;
+}
+
+function showColMapper(detected = {}) {
+  const mapper = document.getElementById('colMapper');
+  mapper.style.display = '';
+  const fields = [
+    {id:'colBarcode', label:'Código barra'},
+    {id:'colCode',    label:'Cód. interno'},
+    {id:'colName',    label:'Nombre'},
+    {id:'colQty',     label:'Cantidad'},
+    {id:'colLoc',     label:'Ubicación'}
+  ];
+  const keys = ['barcode','code','name','qty','location'];
+  let html = '<h3>⚙ Mapear columnas</h3>';
+  fields.forEach((f, fi) => {
+    html += `<div class="col-row"><span class="col-label">${f.label}</span>
+      <select id="${f.id}"><option value="">— ninguna —</option>`;
+    headers.forEach((h, i) => {
+      const sel = detected[keys[fi]] === i ? ' selected' : '';
+      html += `<option value="${i}"${sel}>${h}</option>`;
+    });
+    html += `</select></div>`;
+  });
+  html += `<button class="btn btn-primary" onclick="loadInventoryManual()">✓ Cargar inventario</button>`;
+  mapper.innerHTML = html;
+}
+
+function showPreview(rows) {
+  const wrap = document.getElementById('previewTable');
+  wrap.style.display = '';
+  let html = '<table><tr>';
+  rows[0].forEach(h => html += `<th>${h}</th>`);
+  html += '</tr>';
+  rows.slice(1).forEach(r => {
+    html += '<tr>';
+    r.forEach(c => html += `<td>${c}</td>`);
+    html += '</tr>';
+  });
+  html += '</table>';
+  wrap.innerHTML = html;
+}
+
+function autoLoadInventory(det) {
+  buildInventory(
+    det.barcode !== '' ? det.barcode : NaN,
+    det.code    !== '' ? det.code    : NaN,
+    det.name    !== '' ? det.name    : NaN,
+    det.qty     !== '' ? det.qty     : NaN,
+    det.location!== '' ? det.location: NaN,
+    det.cost    !== '' ? det.cost    : NaN,
+    det.price   !== '' ? det.price   : NaN
+  );
+}
+
+function loadInventoryManual() {
+  const bIdx = parseInt(document.getElementById('colBarcode').value);
+  const cIdx = parseInt(document.getElementById('colCode').value);
+  const nIdx = parseInt(document.getElementById('colName').value);
+  const qIdx = parseInt(document.getElementById('colQty').value);
+  const lIdx = parseInt(document.getElementById('colLoc').value);
+  if (isNaN(nIdx) && isNaN(bIdx) && isNaN(cIdx)) {
+    showToast('Selecciona al menos nombre o código', 'error');
+    return;
+  }
+  buildInventory(bIdx, cIdx, nIdx, qIdx, lIdx, NaN, NaN);
+}
+
+function buildInventory(bIdx, cIdx, nIdx, qIdx, lIdx, costIdx, priceIdx) {
+  inventory = {};
+  rawData.forEach((row, i) => {
+    const barcode  = !isNaN(bIdx) ? String(row[bIdx] || '').trim() : '';
+    const code     = !isNaN(cIdx) ? String(row[cIdx] || '').trim() : '';
+    const name     = !isNaN(nIdx) ? String(row[nIdx] || '').trim() : (barcode || code);
+    const qty      = !isNaN(qIdx) ? parseFloat(row[qIdx]) || 0 : 0;
+    const location = !isNaN(lIdx) ? String(row[lIdx] || '').trim() : '';
+    const cost  = !isNaN(costIdx)  ? parseFloat(row[costIdx])  || 0 : 0;
+    const price = !isNaN(priceIdx) ? parseFloat(row[priceIdx]) || 0 : 0;
+    if (!name && !barcode && !code) return;
+    const key = barcode || code || `row_${i}`;
+    if (!inventory[key]) {
+      inventory[key] = { barcode, code, name, qty, location, cost, price, scanned: false, scannedQty: 0, gondola: '' };
+    }
+  });
+  const count = Object.keys(inventory).length;
+  document.getElementById('uploadSuccess').style.display = '';
+  document.getElementById('uploadSuccessText').textContent = `${count} productos cargados automáticamente ✓`;
+  document.getElementById('colMapper').style.display = 'none';
+  document.getElementById('previewTable').style.display = 'none';
+  document.getElementById('dropZone').style.display = 'none';
+  updateHeader();
+  saveState();
+  showToast(`${count} productos cargados`, 'success');
+}
+
+function resetInventory() {
+  if (!confirm('¿Borrar el inventario actual? Se perderá el progreso guardado.')) return;
+  inventory = {};
+  rawData = [];
+  headers = [];
+  clearState();
+  document.getElementById('uploadSuccess').style.display = 'none';
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('colMapper').style.display = 'none';
+  document.getElementById('previewTable').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  updateHeader();
+}
+
+// ═══════════════════════════════════════════
+// BARCODE DECODER — EAN-13, EAN-8, Code128, Code39, UPC-A/E
+// 100% inline, no CDN, works from file:// in Chrome/Brave
+// ═══════════════════════════════════════════
+
+const BarcodeEngine = (() => {
+  // ── EAN / UPC decoder ──────────────────────────────────────────
+  const EAN_L = {
+    '0001101':'0','0011001':'1','0010011':'2','0111101':'3','0100011':'4',
+    '0110001':'5','0101111':'6','0111011':'7','0110111':'8','0001011':'9'
+  };
+  const EAN_G = {
+    '0100111':'0','0110011':'1','0011011':'2','0100001':'3','0011101':'4',
+    '0111001':'5','0000101':'6','0010001':'7','0001001':'8','0010111':'9'
+  };
+  const EAN_R = {
+    '1110010':'0','1100110':'1','1101100':'2','1000010':'3','1011100':'4',
+    '1001110':'5','1010000':'6','1000100':'7','1001000':'8','1110100':'9'
+  };
+  const EAN13_PARITY = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG',
+    'LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+
+  function bits2ean(bits) {
+    // Try EAN-13
+    if (bits.length >= 95) {
+      for (let off = 0; off <= bits.length - 95; off++) {
+        const b = bits.slice(off, off + 95);
+        if (b.slice(0,3) !== '101') continue;
+        if (b.slice(45,50) !== '01010') continue;
+        if (b.slice(92,95) !== '101') continue;
+        let digits = '', firstDigit = -1;
+        let parityStr = '';
+        for (let i = 0; i < 6; i++) {
+          const chunk = b.slice(3 + i*7, 10 + i*7);
+          if (EAN_L[chunk] !== undefined) { digits += EAN_L[chunk]; parityStr += 'L'; }
+          else if (EAN_G[chunk] !== undefined) { digits += EAN_G[chunk]; parityStr += 'G'; }
+          else { digits = null; break; }
+        }
+        if (!digits) continue;
+        firstDigit = EAN13_PARITY.indexOf(parityStr);
+        if (firstDigit < 0) continue;
+        let right = '';
+        for (let i = 0; i < 6; i++) {
+          const chunk = b.slice(50 + i*7, 57 + i*7);
+          if (EAN_R[chunk] !== undefined) right += EAN_R[chunk];
+          else { right = null; break; }
+        }
+        if (!right) continue;
+        const full = firstDigit + digits + right;
+        if (full.length === 13 && checkEAN(full)) return full;
+      }
+    }
+    // Try EAN-8
+    if (bits.length >= 67) {
+      for (let off = 0; off <= bits.length - 67; off++) {
+        const b = bits.slice(off, off + 67);
+        if (b.slice(0,3) !== '101') continue;
+        if (b.slice(31,36) !== '01010') continue;
+        if (b.slice(64,67) !== '101') continue;
+        let left = '', right = '';
+        for (let i = 0; i < 4; i++) {
+          const c = b.slice(3 + i*7, 10 + i*7);
+          if (EAN_L[c] !== undefined) left += EAN_L[c]; else { left = null; break; }
+        }
+        if (!left) continue;
+        for (let i = 0; i < 4; i++) {
+          const c = b.slice(36 + i*7, 43 + i*7);
+          if (EAN_R[c] !== undefined) right += EAN_R[c]; else { right = null; break; }
+        }
+        if (!right) continue;
+        const full = left + right;
+        if (full.length === 8 && checkEAN(full)) return full;
+      }
+    }
+    return null;
+  }
+
+  function checkEAN(s) {
+    let sum = 0;
+    for (let i = 0; i < s.length - 1; i++) {
+      sum += parseInt(s[i]) * (i % 2 === 0 ? (s.length === 13 ? 1 : 3) : (s.length === 13 ? 3 : 1));
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return check === parseInt(s[s.length - 1]);
+  }
+
+  // ── Code 128 decoder ───────────────────────────────────────────
+  const C128 = [
+    [2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2],
+    [1,3,1,2,2,2],[1,2,2,2,1,3],[1,2,2,3,1,2],[1,3,2,2,1,2],[2,2,1,2,1,3],
+    [2,2,1,3,1,2],[2,3,1,2,1,2],[1,1,2,2,3,2],[1,2,2,1,3,2],[1,2,2,2,3,1],
+    [1,1,3,2,2,2],[1,2,3,1,2,2],[1,2,3,2,2,1],[2,2,3,2,1,1],[2,2,1,1,3,2],
+    [2,2,1,2,3,1],[2,1,3,2,1,2],[2,2,3,1,1,2],[3,1,2,1,3,1],[3,1,1,2,2,2],
+    [3,2,1,1,2,2],[3,2,1,2,2,1],[3,1,2,2,1,2],[3,2,2,1,1,2],[3,2,2,2,1,1],
+    [2,1,2,1,2,3],[2,1,2,3,2,1],[2,3,2,1,2,1],[1,1,1,3,2,3],[1,3,1,1,2,3],
+    [1,3,1,3,2,1],[1,1,2,3,1,3],[1,3,2,1,1,3],[1,3,2,3,1,1],[2,1,1,3,1,3],
+    [2,3,1,1,1,3],[2,3,1,3,1,1],[1,1,3,1,2,3],[1,1,3,3,2,1],[1,3,3,1,2,1],
+    [1,1,2,1,3,3],[1,1,2,3,3,1],[1,3,2,1,3,1],[1,1,3,2,1,3],[1,1,3,2,3,1],
+    [2,1,3,2,3,1],[2,3,3,1,1,1],[2,1,3,1,1,3],[2,1,3,3,1,1],[2,1,1,1,3,3],
+    [2,1,1,3,3,1],[2,3,1,1,3,1],[1,1,2,2,1,4],[1,2,2,1,1,4],[1,2,2,4,1,1],
+    [1,4,2,1,1,2],[1,4,2,2,1,1],[1,2,4,1,2,1],[1,1,1,4,2,2],[1,1,4,1,2,2],
+    [1,1,4,2,2,1],[1,2,1,1,4,2],[1,2,1,2,4,1],[1,1,2,4,1,2],[1,2,4,2,1,1],
+    [1,1,1,1,4,3],[1,1,1,3,4,1],[1,3,1,1,4,1],[1,1,4,1,1,3],[1,1,4,3,1,1],
+    [4,1,1,1,1,3],[4,1,1,3,1,1],[1,1,3,1,4,1],[1,1,4,1,3,1],[3,1,1,1,4,1],
+    [4,1,1,1,3,1],[2,1,1,4,1,2],[2,1,1,2,1,4],[2,1,1,2,3,2],[2,1,1,1,1,4], // 96: stop
+    [2,3,3,1,1,2],[2,2,2,2,2,2] // special
+  ];
+  const C128_STOP = [2,3,3,1,1,1,2];
+
+  function decodeC128(runs) {
+    // Find start: 211412, 211214, 211232 = A,B,C
+    let si = -1, startCode = -1;
+    for (let i = 0; i < runs.length - 6; i++) {
+      for (let sc = 103; sc <= 105; sc++) {
+        if (matchBar(runs, i, C128[sc])) { si = i; startCode = sc; break; }
+      }
+      if (si >= 0) break;
+    }
+    if (si < 0) return null;
+    let pos = si + 6, charset = startCode - 103; // 0=A,1=B,2=C
+    let values = [startCode], chars = [];
+    while (pos < runs.length - 6) {
+      // check stop
+      if (runs.length - pos >= 7) {
+        const sr = runs.slice(pos, pos+7);
+        if (sr[0]===2&&sr[1]===3&&sr[2]===3&&sr[3]===1&&sr[4]===1&&sr[5]===1&&sr[6]===2) {
+          break;
+        }
+      }
+      let found = -1;
+      for (let ci = 0; ci < 107; ci++) {
+        if (matchBar(runs, pos, C128[ci])) { found = ci; break; }
+      }
+      if (found < 0) return null;
+      values.push(found);
+      pos += 6;
+      // decode char
+      if (found === 99 || (startCode === 105 && chars.length === 0)) charset = 2; // C
+      else if (found === 100) charset = 1; // B
+      else if (found === 101) charset = 0; // A
+      else {
+        if (charset === 2) {
+          chars.push(String(found).padStart(2,'0'));
+        } else {
+          if (charset === 1) { // B
+            if (found < 64) chars.push(String.fromCharCode(32 + found));
+            else if (found < 96) chars.push(String.fromCharCode(found - 64));
+          } else { // A
+            if (found < 64) chars.push(String.fromCharCode(32 + found));
+          }
+        }
+      }
+    }
+    if (values.length < 3) return null;
+    // checksum
+    let chk = values[0];
+    for (let i = 1; i < values.length - 1; i++) chk += i * values[i];
+    if (chk % 103 !== values[values.length-1]) return null;
+    return chars.join('');
+  }
+
+  function matchBar(runs, pos, pattern) {
+    if (pos + pattern.length > runs.length) return false;
+    const unit = runs[pos] / pattern[0];
+    if (unit < 0.5) return false;
+    for (let i = 0; i < pattern.length; i++) {
+      const expected = pattern[i] * unit;
+      const actual = runs[pos + i];
+      if (Math.abs(actual - expected) > unit * 0.4 + 0.5) return false;
+    }
+    return true;
+  }
+
+  // ── Code 39 decoder ────────────────────────────────────────────
+  const C39_CHARS = {
+    '111221211':'0','211211112':'1','112211112':'2','212211111':'3',
+    '111221112':'4','211221111':'5','112221111':'6','111211212':'7',
+    '211211211':'8','112211211':'9','211112112':'A','112112112':'B',
+    '212112111':'C','111122112':'D','211122111':'E','112122111':'F',
+    '111112212':'G','211112211':'H','112112211':'I','111122211':'J',
+    '211111122':'K','112111122':'L','212111121':'M','111121122':'N',
+    '211121121':'O','112121121':'P','111111222':'Q','211111221':'R',
+    '112111221':'S','111121221':'T','221111112':'U','122111112':'V',
+    '222111111':'W','121121112':'X','221121111':'Y','122121111':'Z',
+    '121111212':'-','221111211':'.','122111211':' ','111212112':'$',
+    '111211212':'/','112111212':'+','111212211':'%','121121211':'*'
+  };
+
+  function decodeC39(runs) {
+    // Find * start
+    let result = '';
+    let i = 0;
+    let foundStart = false;
+    while (i <= runs.length - 9) {
+      const key = runsToKey(runs, i, 9);
+      if (key === C39_CHARS && C39_CHARS[key] === '*') { foundStart = true; i += 10; break; }
+      if (C39_CHARS[key] === '*') { foundStart = true; i += 10; break; }
+      i++;
+    }
+    if (!foundStart) return null;
+    while (i <= runs.length - 9) {
+      const key = runsToKey(runs, i, 9);
+      const ch = C39_CHARS[key];
+      if (!ch) return result.length > 0 ? result : null;
+      if (ch === '*') break;
+      result += ch;
+      i += 10;
+    }
+    return result.length > 0 ? result : null;
+  }
+
+  function runsToKey(runs, pos, len) {
+    const slice = runs.slice(pos, pos+len);
+    const unit = Math.min(...slice);
+    if (unit < 0.5) return '';
+    return slice.map(r => {
+      const v = r / unit;
+      if (v < 1.7) return '1';
+      if (v < 2.5) return '2';
+      return '3';
+    }).join('');
+  }
+
+  // ── Image → runs ───────────────────────────────────────────────
+  function imageToRuns(imageData, row) {
+    const { data, width } = imageData;
+    const y = Math.floor(row * imageData.height);
+    const runs = [];
+    let prev = -1, count = 0;
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const lum = (data[idx]*77 + data[idx+1]*150 + data[idx+2]*29) >> 8;
+      const bit = lum < 128 ? 1 : 0;
+      if (prev < 0) { prev = bit; count = 1; }
+      else if (bit === prev) { count++; }
+      else { runs.push(count); prev = bit; count = 1; }
+    }
+    if (count > 0) runs.push(count);
+    return runs;
+  }
+
+  function imageToBits(imageData, row) {
+    const { data, width } = imageData;
+    const y = Math.floor(row * imageData.height);
+    let bits = '';
+    // adaptive threshold
+    const lums = [];
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      lums.push((data[idx]*77 + data[idx+1]*150 + data[idx+2]*29) >> 8);
+    }
+    const avg = lums.reduce((a,b) => a+b, 0) / lums.length;
+    const thresh = avg * 0.85;
+    for (const l of lums) bits += l < thresh ? '1' : '0';
+    return bits;
+  }
+
+  // ── Public API ─────────────────────────────────────────────────
+  function decode(imageData) {
+    // Try multiple horizontal scan lines
+    const rows = [0.3, 0.4, 0.5, 0.6, 0.7, 0.35, 0.45, 0.55, 0.65];
+    for (const rowFrac of rows) {
+      // EAN/UPC via bits
+      try {
+        const bits = imageToBits(imageData, rowFrac);
+        const ean = bits2ean(bits);
+        if (ean) return ean;
+      } catch(e) {}
+      // Code128 / Code39 via runs
+      try {
+        const runs = imageToRuns(imageData, rowFrac);
+        const c128 = decodeC128(runs);
+        if (c128 && c128.length > 1) return c128;
+        const c39 = decodeC39(runs);
+        if (c39 && c39.length > 1) return c39;
+      } catch(e) {}
+    }
+    return null;
+  }
+
+  return { decode };
+})();
+
+// ═══════════════════════════════════════════
+// SCANNER ENGINE
+// ═══════════════════════════════════════════
+let videoStream = null;
+let barcodeDetector = null;
+let scanLoop = null;
+let useNativeDetector = false;
+
+async function startScanner() {
+  // Init BarcodeDetector if available (faster, uses GPU)
+  if ('BarcodeDetector' in window) {
+    try {
+      barcodeDetector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','itf','codabar']
+      });
+      useNativeDetector = true;
+    } catch(e) { useNativeDetector = false; }
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+    videoStream = stream;
+    const video = document.getElementById('scanVideo');
+    video.srcObject = stream;
+    await video.play();
+
+    document.getElementById('scannerInactive').style.display = 'none';
+    video.style.display = '';
+    document.getElementById('scanOverlay').style.display = '';
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('btnStop').style.display = '';
+    scannerRunning = true;
+
+    startDecodeLoop(video);
+    setTriggerEnabled(true);
+    showToast(useNativeDetector ? '⚡ Escáner nativo activo' : '🔍 Escáner activo', 'success');
+
+  } catch(err) {
+    // Camera blocked from file:// — use photo mode
+    showPhotoMode();
+  }
+}
+
+function startDecodeLoop(video) {
+  // Camera stays live but does NOT auto-scan — only scans when trigger is held
+  // scanLoop kept as null intentionally; trigger starts its own loop
+}
+
+function showPhotoMode() {
+  const wrap = document.getElementById('scannerWrap');
+  wrap.style.background = 'var(--surface2)';
+  wrap.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:24px;text-align:center;">
+      <div style="font-size:48px;">📸</div>
+      <div style="font-size:12px;color:var(--accent);font-weight:700;letter-spacing:2px;">MODO FOTO</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+        Para usar la cámara en vivo, abre el archivo así en Chrome:<br>
+        <code style="color:var(--text);background:var(--bg);padding:2px 6px;border-radius:4px;">file:///sdcard/Download/inventario-auditoria.html</code><br><br>
+        Por ahora usa <b style="color:var(--accent)">📸 Tomar Foto</b> — detecta el código automáticamente.
+      </div>
+    </div>`;
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnPhoto').style.display = '';
+  scannerRunning = false;
+}
+
+async function processPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  input.value = '';
+
+  // Try native BarcodeDetector first (fastest)
+  if ('BarcodeDetector' in window) {
+    try {
+      if (!barcodeDetector) barcodeDetector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','itf','codabar']
+      });
+      const bitmap = await createImageBitmap(file);
+      const results = await barcodeDetector.detect(bitmap);
+      if (results.length > 0) { processCode(results[0].rawValue); return; }
+    } catch(e) {}
+  }
+
+  // Fallback: decode with our engine
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.getElementById('scanCanvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0);
+    const imgData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    const code = BarcodeEngine.decode(imgData);
+    if (code) { processCode(code); return; }
+  } catch(e) {}
+
+  showToast('No se detectó código — intenta manualmente', 'error');
+}
+
+function stopScanner() {
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+  if (scanLoop) { clearInterval(scanLoop); scanLoop = null; }
+  scannerRunning = false;
+  const video = document.getElementById('scanVideo');
+  if (video) video.style.display = 'none';
+  document.getElementById('scanOverlay').style.display = 'none';
+  document.getElementById('scannerInactive').style.display = '';
+  document.getElementById('btnStart').style.display = '';
+  document.getElementById('btnStop').style.display = 'none';
+  document.getElementById('btnPhoto').style.display = 'none';
+  setTriggerEnabled(false);
+}
+
+function manualSearch() {
+  const val = document.getElementById('manualCode').value.trim();
+  if (!val) return;
+  processCode(val);
+  document.getElementById('manualCode').value = '';
+}
+
+function processCode(code) {
+  const gondola = document.getElementById('gondolaInput').value.trim();
+  const box = document.getElementById('lastScan');
+  box.className = 'last-scan';
+
+  // Search by barcode exact, then code exact, then name partial
+  let found = null;
+  let foundKey = null;
+
+  // Exact barcode match
+  if (inventory[code]) { found = inventory[code]; foundKey = code; }
+
+  if (!found) {
+    for (const [k, v] of Object.entries(inventory)) {
+      if (v.barcode === code || v.code === code) { found = v; foundKey = k; break; }
+    }
+  }
+
+  if (!found) {
+    const cl = code.toLowerCase();
+    for (const [k, v] of Object.entries(inventory)) {
+      if (v.name.toLowerCase().includes(cl) || v.barcode.includes(code) || v.code.includes(code)) {
+        found = v; foundKey = k; break;
+      }
+    }
+  }
+
+  if (!found) {
+    box.classList.add('notfound');
+    box.innerHTML = '<div class="scan-result-label">No encontrado</div>'
+      + '<div class="scan-result-code">' + code + '</div>'
+      + '<div class="scan-result-status err">&#9888; No existe en el inventario</div>';
+    vibrate([100,50,100]);
+    beep('err');
+    document.getElementById('triggerLabel').textContent = 'Presiona para escanear';
+    return;
+  }
+
+  // Mark scanned
+  if (!found.scanned) {
+    found.scanned = true;
+    found.scannedQty = 1;
+    found.gondola = gondola;
+    vibrate([30,20,30]);
+    beep('ok');
+  } else {
+    found.gondola = gondola || found.gondola;
+    vibrate([50]);
+    beep('dup');
+  }
+
+  // Build result card with qty stepper + cost/price inline
+  const fk = foundKey;
+  box.classList.add('found');
+  let priceHtml = '';
+  if (found.cost || found.price) {
+    priceHtml = '<div style="display:flex;gap:8px;margin:6px 0;">';
+    if (found.cost)  priceHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;"><span style="color:var(--muted)">Costo </span><span style="color:var(--warn);font-weight:700;">' + formatMoney(found.cost) + '</span></div>';
+    if (found.price) priceHtml += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;"><span style="color:var(--muted)">Precio </span><span style="color:var(--accent);font-weight:700;">' + formatMoney(found.price) + '</span></div>';
+    priceHtml += '</div>';
+  }
+  box.innerHTML = '<div class="scan-result-label">Producto encontrado</div>'
+    + '<div class="scan-result-code">' + (found.barcode || found.code) + '</div>'
+    + '<div class="scan-result-name">' + found.name + '</div>'
+    + (gondola ? '<div style="font-size:10px;color:var(--accent2);margin-top:2px;">&#128205; ' + gondola + '</div>' : '')
+    + priceHtml
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
+    + '<div style="font-size:11px;color:var(--muted);">Sistema: <b style="color:var(--text)">' + (found.qty || '?') + '</b></div>'
+    + '<div style="display:flex;align-items:center;gap:6px;">'
+    + '<span style="font-size:11px;color:var(--muted);">Contado:</span>'
+    + '<div class="qty-stepper">'
+    + '<div class="qty-btn" onclick="adjustLastScan('' + fk + '',-1)">&#8722;</div>'
+    + '<div class="qty-num" id="lastScanQty">' + found.scannedQty + '</div>'
+    + '<div class="qty-btn" onclick="adjustLastScan('' + fk + '',1)">+</div>'
+    + '</div></div></div>';
+
+  updateHeader();
+  updateProgress();
+  saveState();
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function formatMoney(n) {
+  if (!n) return '';
+  return n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function adjustLastScan(key, delta) {
+  if (!inventory[key]) return;
+  const newQ = Math.max(0, (inventory[key].scannedQty || 0) + delta);
+  inventory[key].scannedQty = newQ;
+  inventory[key].scanned = newQ > 0;
+  const el = document.getElementById('lastScanQty');
+  if (el) el.textContent = newQ;
+  updateHeader();
+  saveState();
+}
+
+// ── BEEP SOUND ─────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function beep(type = 'ok') {
+  try {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    if (type === 'ok') {
+      // Two-tone success beep
+      osc.frequency.setValueAtTime(1047, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1319, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.25);
+    } else if (type === 'dup') {
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.15);
+    } else {
+      // Error: low buzz
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.3);
+    }
+  } catch(e) {}
+}
+
+// ── TRIGGER BUTTON ─────────────────────────────────────────────
+let triggerActive = false;
+let triggerScanLoop = null;
+
+function setTriggerEnabled(enabled) {
+  const btn = document.getElementById('triggerBtn');
+  const lbl = document.getElementById('triggerLabel');
+  if (!btn) return;
+  if (enabled) {
+    btn.classList.remove('disabled');
+    lbl.textContent = 'Presiona para escanear';
+  } else {
+    btn.classList.add('disabled');
+    lbl.textContent = 'Inicia la cámara primero';
+  }
+}
+
+function triggerPress() {
+  if (!scannerRunning) return;
+  triggerActive = true;
+  const btn = document.getElementById('triggerBtn');
+  btn.classList.add('firing');
+  document.getElementById('triggerLabel').textContent = '🔍 Buscando código...';
+  vibrate([15]);
+  const video = document.getElementById('scanVideo');
+  if (video) startTriggerScanLoop(video);
+}
+
+function triggerRelease() {
+  triggerActive = false;
+  const btn = document.getElementById('triggerBtn');
+  if (btn) btn.classList.remove('firing');
+  if (triggerScanLoop) { clearInterval(triggerScanLoop); triggerScanLoop = null; }
+  // If no code found while held, beep error
+  if (document.getElementById('triggerLabel').textContent === '🔍 Buscando código...') {
+    document.getElementById('triggerLabel').textContent = 'Presiona para escanear';
+    beep('err');
+    vibrate([80,30,80]);
+  }
+}
+
+function startTriggerScanLoop(video) {
+  if (triggerScanLoop) clearInterval(triggerScanLoop);
+  const canvas = document.getElementById('scanCanvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let busy = false;
+  let found = false;
+  triggerScanLoop = setInterval(async () => {
+    if (!triggerActive || busy || video.readyState < 2) return;
+    busy = true;
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      let code = null;
+      if (useNativeDetector && barcodeDetector) {
+        const results = await barcodeDetector.detect(canvas);
+        if (results.length > 0) code = results[0].rawValue;
+      }
+      if (!code) {
+        const cropH = Math.floor(video.videoHeight * 0.5);
+        const cropY = Math.floor(video.videoHeight * 0.25);
+        const imgData = ctx.getImageData(0, cropY, video.videoWidth, cropH);
+        code = BarcodeEngine.decode(imgData);
+      }
+      if (code && !found) {
+        found = true;
+        // Stop looping — one read per trigger press
+        clearInterval(triggerScanLoop);
+        triggerScanLoop = null;
+        triggerActive = false;
+        document.getElementById('triggerBtn').classList.remove('firing');
+        document.getElementById('triggerLabel').textContent = 'Presiona para escanear';
+        lastCode = code;
+        lastCodeTime = Date.now();
+        processCode(code);
+      }
+    } catch(e) {}
+    busy = false;
+  }, 80);
+}
+
+function updateProgress() {
+  const total = Object.keys(inventory).length;
+  const scanned = Object.values(inventory).filter(v => v.scanned).length;
+  const pct = total ? Math.round(scanned/total*100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${scanned} / ${total} productos auditados (${pct}%)`;
+}
+
+function updateHeader() {
+  const total = Object.keys(inventory).length;
+  const scanned = Object.values(inventory).filter(v => v.scanned).length;
+  document.getElementById('hdr-total').textContent = total;
+  document.getElementById('hdr-scanned').textContent = scanned;
+  document.getElementById('hdr-pending').textContent = total - scanned;
+  updateProgress();
+}
+
+// LIST
+let currentFilter = 'all';
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(f === 'all' ? 'fAll' : f === 'pending' ? 'fPending' : 'fScanned').classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const hasData = Object.keys(inventory).length > 0;
+  document.getElementById('noDataList').style.display = hasData ? 'none' : '';
+  document.getElementById('listContent').style.display = hasData ? '' : 'none';
+  if (!hasData) return;
+
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const list = document.getElementById('productList');
+
+  let items = Object.entries(inventory);
+  if (currentFilter === 'pending') items = items.filter(([,v]) => !v.scanned);
+  if (currentFilter === 'scanned') items = items.filter(([,v]) => v.scanned);
+  if (search) items = items.filter(([,v]) => 
+    v.name.toLowerCase().includes(search) || 
+    v.barcode.includes(search) || 
+    v.code.toLowerCase().includes(search)
+  );
+
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Sin resultados</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(([k, v]) => {
+    const prices = (v.cost || v.price) ? '<div style="display:flex;gap:6px;margin-top:3px;">'
+      + (v.cost  ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--warn);">C: ' + formatMoney(v.cost) + '</span>' : '')
+      + (v.price ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--accent);">P: ' + formatMoney(v.price) + '</span>' : '')
+      + '</div>' : '';
+    return '<div class="product-card ' + (v.scanned ? 'scanned' : 'pending') + '">'
+      + '<div class="status-dot ' + (v.scanned ? 'scanned' : 'pending') + '" onclick="toggleProduct('' + k + '')" style="cursor:pointer;flex-shrink:0;"></div>'
+      + '<div class="product-info" onclick="toggleProduct('' + k + '')" style="cursor:pointer;">'
+      + '<div class="product-code">' + (v.barcode || v.code || '—') + (v.location ? ' · ' + v.location : '') + '</div>'
+      + '<div class="product-name">' + v.name + '</div>'
+      + (v.scanned && v.gondola ? '<div class="product-code" style="color:var(--accent2)">&#128205; ' + v.gondola + '</div>' : '')
+      + prices
+      + '</div>'
+      + '<div class="qty-stepper" onclick="event.stopPropagation()">'
+      + '<div class="qty-btn" onclick="changeQty('' + k + '',-1)">&#8722;</div>'
+      + '<div class="qty-num">' + (v.scannedQty || 0) + '</div>'
+      + '<div class="qty-btn" onclick="changeQty('' + k + '',1)">+</div>'
+      + '<div class="qty-total">/' + (v.qty || '?') + '</div>'
+      + '</div></div>';
+  }).join('');
+}
+
+function toggleProduct(key) {
+  if (!inventory[key]) return;
+  inventory[key].scanned = !inventory[key].scanned;
+  if (!inventory[key].scanned) inventory[key].scannedQty = 0;
+  else if (inventory[key].scannedQty === 0) inventory[key].scannedQty = 1;
+  updateHeader();
+  saveState();
+  renderList();
+}
+
+function changeQty(key, delta) {
+  if (!inventory[key]) return;
+  const newQty = Math.max(0, (inventory[key].scannedQty || 0) + delta);
+  inventory[key].scannedQty = newQty;
+  inventory[key].scanned = newQty > 0;
+  updateHeader();
+  saveState();
+  renderList();
+}
+
+// REPORT
+function renderReport() {
+  const hasScanned = Object.values(inventory).some(v => v.scanned);
+  const hasData = Object.keys(inventory).length > 0;
+  document.getElementById('noDataReport').style.display = hasData ? 'none' : '';
+  document.getElementById('reportContent').style.display = hasData ? '' : 'none';
+  if (!hasData) return;
+
+  const total = Object.keys(inventory).length;
+  const scanned = Object.values(inventory).filter(v => v.scanned).length;
+  const pending = total - scanned;
+  const pct = total ? Math.round(scanned/total*100) : 0;
+
+  document.getElementById('rTotal').textContent = total;
+  document.getElementById('rScanned').textContent = scanned;
+  document.getElementById('rPending').textContent = pending;
+  document.getElementById('rPercent').textContent = pct + '%';
+
+  // By location
+  const locs = {};
+  Object.values(inventory).forEach(v => {
+    const loc = v.gondola || v.location || 'Sin ubicación';
+    if (!locs[loc]) locs[loc] = {total:0, scanned:0};
+    locs[loc].total++;
+    if (v.scanned) locs[loc].scanned++;
+  });
+  const locDiv = document.getElementById('locationBreakdown');
+  locDiv.innerHTML = Object.entries(locs).map(([loc, s]) => `
+    <div class="product-card">
+      <div class="status-dot ${s.scanned===s.total ? 'scanned':'pending'}"></div>
+      <div class="product-info">
+        <div class="product-name">📍 ${loc}</div>
+      </div>
+      <div class="product-count ${s.scanned===s.total?'':'pending'}">
+        <span>${s.scanned}</span>/${s.total}
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state">Sin ubicaciones</div>';
+
+  // Pending list
+  const pendingItems = Object.values(inventory).filter(v => !v.scanned);
+  document.getElementById('pendingTitle').textContent = `⚠ Pendientes (${pendingItems.length})`;
+  document.getElementById('pendingList').innerHTML = pendingItems.slice(0,30).map(v => `
+    <div class="product-card pending">
+      <div class="status-dot pending"></div>
+      <div class="product-info">
+        <div class="product-code">${v.barcode || v.code || '—'} ${v.location ? '· '+v.location : ''}</div>
+        <div class="product-name">${v.name}</div>
+      </div>
+      <div class="product-count pending"><span>0</span>/${v.qty || '?'}</div>
+    </div>
+  `).join('') + (pendingItems.length > 30 ? `<div style="text-align:center;padding:10px;color:var(--muted);font-size:12px;">... y ${pendingItems.length-30} más</div>` : '');
+}
+
+function exportReport() {
+  const rows = [['Código Barra','Código Interno','Nombre','Cantidad Sistema','Cantidad Auditada','Estado','Ubicación','Gondola Escaneada']];
+  Object.values(inventory).forEach(v => {
+    rows.push([v.barcode, v.code, v.name, v.qty, v.scannedQty, v.scanned ? 'AUDITADO' : 'PENDIENTE', v.location, v.gondola]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Auditoria');
+  XLSX.writeFile(wb, `auditoria_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('Reporte exportado ✓', 'success');
+}
+
+// ── INIT: restore session on load ─────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadState();
+});
+
+// TOAST
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = 'toast', 2800);
+}
+</script>
+</body>
+</html>
