@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gestión — Productos & Catálogo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+:root{
+  --bg:#07090f;--s1:#0f1117;--s2:#161820;--b:#22253a;
+  --g:#00e5a0;--b2:#3d8eff;--w:#ff8c42;--d:#ff3d6b;--pu:#a78bfa;
+  --t:#e8eaf6;--m:#5c607a;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--t);font-family:'Courier New',monospace;min-height:100dvh}
+
+.hdr{position:sticky;top:0;z-index:100;background:var(--s1);border-bottom:1px solid var(--b);
+  padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:11px;font-weight:900;letter-spacing:3px;color:var(--g)}
+.back-btn{font-size:11px;color:var(--b2);letter-spacing:1px;text-decoration:none;
+  padding:6px 10px;border:1px solid var(--b2);border-radius:8px;background:transparent}
+
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--b)}
+.tab{flex:1;padding:11px 4px;text-align:center;font-size:9px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--m);cursor:pointer;
+  border-bottom:2px solid transparent;transition:.2s;white-space:nowrap}
+.tab.on{color:var(--g);border-color:var(--g)}
+
+.panel{display:none;padding:14px}
+.panel.on{display:block}
+
+.card{background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:14px;margin-bottom:10px}
+.sec{font-size:9px;letter-spacing:3px;color:var(--g);text-transform:uppercase;margin-bottom:10px}
+
+.btn{display:block;width:100%;padding:12px;border-radius:10px;border:none;
+  font-family:inherit;font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:.15s;margin-top:8px}
+.btn:active{transform:scale(.98);opacity:.85}
+.btn-g{background:var(--g);color:#000}
+.btn-b{background:var(--b2);color:#fff}
+.btn-o{background:transparent;color:var(--t);border:1px solid var(--b)}
+.btn-d{background:rgba(255,61,107,.1);color:var(--d);border:1px solid var(--d)}
+.btn-pu{background:rgba(167,139,250,.15);color:var(--pu);border:1px solid var(--pu)}
+.btn-w{background:rgba(255,140,66,.1);color:var(--w);border:1px solid var(--w)}
+.btn-sm{width:auto;padding:7px 14px;font-size:10px;margin-top:0;display:inline-block}
+
+.inp{width:100%;background:var(--s1);border:1px solid var(--b);color:var(--t);
+  border-radius:8px;padding:10px 12px;font-family:inherit;font-size:13px;outline:none;margin-bottom:8px}
+.inp:focus{border-color:var(--g)}
+.inp-row{display:flex;gap:8px;margin-bottom:8px}
+.inp-row .inp{margin-bottom:0}
+.inp-label{font-size:10px;color:var(--m);letter-spacing:1px;margin-bottom:4px}
+
+.drop{border:2px dashed var(--b);border-radius:12px;padding:30px 20px;
+  text-align:center;cursor:pointer;position:relative;transition:.2s;margin-bottom:10px}
+.drop:active{border-color:var(--g);background:rgba(0,229,160,.05)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-icon{font-size:36px;margin-bottom:8px}
+.drop-title{font-size:12px;font-weight:700;letter-spacing:2px}
+.drop-sub{font-size:10px;color:var(--m);margin-top:4px}
+
+/* Product cards */
+.prod-list{display:flex;flex-direction:column;gap:6px}
+.prod-card{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px}
+.prod-card.new{border-color:var(--g)}
+.prod-card.modified{border-color:var(--w)}
+.prod-card.missing{border-color:var(--d)}
+.prod-card.ok{border-color:var(--b);opacity:.7}
+.pc-top{display:flex;align-items:flex-start;gap:8px}
+.pc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.pc-dot.new{background:var(--g);box-shadow:0 0 5px var(--g)}
+.pc-dot.modified{background:var(--w)}
+.pc-dot.missing{background:var(--d)}
+.pc-dot.ok{background:var(--m)}
+.pc-info{flex:1;min-width:0}
+.pc-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-code{font-size:10px;color:var(--m);margin-top:1px}
+.pc-badge{font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:10px}
+.pc-badge.new{background:rgba(0,229,160,.15);color:var(--g)}
+.pc-badge.modified{background:rgba(255,140,66,.15);color:var(--w)}
+.pc-badge.missing{background:rgba(255,61,107,.15);color:var(--d)}
+.pc-badge.ok{background:var(--s1);color:var(--m)}
+.pc-body{margin-top:8px;padding-top:8px;border-top:1px solid var(--b);display:none}
+.pc-body.open{display:block}
+.field-row{display:flex;gap:8px;margin-bottom:6px}
+.field-row .inp{margin-bottom:0}
+
+/* Search */
+.search-wrap{position:relative;margin-bottom:10px}
+.search-wrap input{width:100%;background:var(--s2);border:1px solid var(--b);
+  color:var(--t);border-radius:8px;padding:10px 12px 10px 32px;font-family:inherit;font-size:12px;outline:none}
+.search-wrap input:focus{border-color:var(--g)}
+.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px}
+
+/* Stats grid */
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.stat-card{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:12px;text-align:center}
+.stat-big{font-size:28px;font-weight:700}
+.stat-lbl{font-size:9px;color:var(--m);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.stat-card.g .stat-big{color:var(--g)}
+.stat-card.d .stat-big{color:var(--d)}
+.stat-card.w .stat-big{color:var(--w)}
+.stat-card.pu .stat-big{color:var(--pu)}
+
+/* Filter row */
+.filter-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.f-btn{padding:5px 10px;border-radius:20px;border:1px solid var(--b);background:var(--s2);
+  color:var(--m);font-family:inherit;font-size:9px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:.15s}
+.f-btn.on{background:var(--g);color:#000;border-color:var(--g)}
+.f-btn.d.on{background:var(--d);color:#fff;border-color:var(--d)}
+.f-btn.w.on{background:var(--w);color:#000;border-color:var(--w)}
+.f-btn.pu.on{background:var(--pu);color:#000;border-color:var(--pu)}
+
+/* Toast */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--s2);border:1px solid var(--b);border-radius:20px;
+  padding:9px 18px;font-size:11px;letter-spacing:1px;z-index:999;transition:.25s;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:var(--g);color:var(--g)}
+.toast.err{border-color:var(--d);color:var(--d)}
+
+.empty{text-align:center;padding:30px;color:var(--m);font-size:11px;letter-spacing:1px}
+.empty-icon{font-size:32px;margin-bottom:8px}
+.tbl-wrap{overflow:auto;border-radius:8px;border:1px solid var(--b);max-height:240px}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{background:var(--s1);padding:7px 8px;text-align:left;color:var(--g);font-weight:700;
+  letter-spacing:1px;position:sticky;top:0;white-space:nowrap}
+td{padding:6px 8px;border-top:1px solid var(--b);white-space:nowrap}
+.tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:1px;
+  padding:2px 7px;border-radius:10px;text-transform:uppercase}
+.tag.yes{background:rgba(0,229,160,.15);color:var(--g)}
+.tag.no{background:rgba(255,61,107,.15);color:var(--d)}
+.tag.partial{background:rgba(255,140,66,.15);color:var(--w)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">📦 GESTIÓN</div>
+  <a href="index.html" class="back-btn">← Auditoría</a>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="goTab('nuevos')">➕ Nuevos</div>
+  <div class="tab" onclick="goTab('barcode')">🔢 Barcodes</div>
+  <div class="tab" onclick="goTab('catalogo')">📋 Catálogo</div>
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 1: PRODUCTOS NUEVOS / MODIFICADOS
+════════════════════════════════════ -->
+<div class="panel on" id="tab-nuevos">
+
+  <div class="card">
+    <div class="sec">📂 Base: tu inventario actual</div>
+    <div class="drop" id="dropInv">
+      <div class="drop-icon">📊</div>
+      <div class="drop-title">Subir Excel inventario</div>
+      <div class="drop-sub">Tu lista actual · .xlsx .xls .csv</div>
+      <input type="file" id="fileInv" accept=".xlsx,.xls,.csv">
+    </div>
+    <div id="invStatus" style="display:none">
+      <div style="color:var(--g);font-size:12px;font-weight:700" id="invStatusTxt"></div>
+      <button class="btn btn-o" style="margin-top:6px" onclick="resetInv()">↺ Cambiar archivo</button>
+    </div>
+  </div>
+
+  <!-- Add new product manually -->
+  <div class="card">
+    <div class="sec">➕ Agregar producto nuevo</div>
+    <div class="inp-label">Código de barras</div>
+    <input class="inp" id="newBarcode" placeholder="6932584805594">
+    <div class="inp-label">Código interno</div>
+    <input class="inp" id="newCode" placeholder="TGTSC50618">
+    <div class="inp-label">Nombre / Descripción *</div>
+    <input class="inp" id="newName" placeholder="Ej: Cadena 6 pulgadas TOTAL">
+    <div class="inp-row">
+      <div style="flex:1">
+        <div class="inp-label">Costo</div>
+        <input class="inp" id="newCost" type="number" placeholder="0.00" style="margin-bottom:0">
+      </div>
+      <div style="flex:1">
+        <div class="inp-label">Precio venta</div>
+        <input class="inp" id="newPrice" type="number" placeholder="0.00" style="margin-bottom:0">
+      </div>
+      <div style="flex:1">
+        <div class="inp-label">Cantidad</div>
+        <input class="inp" id="newQty" type="number" placeholder="0" style="margin-bottom:0">
+      </div>
+    </div>
+    <div class="inp-label" style="margin-top:8px">Ubicación / Gandola</div>
+    <input class="inp" id="newLoc" placeholder="Ej: Gandola 5">
+    <button class="btn btn-g" onclick="addNewProduct()">+ Agregar al inventario</button>
+  </div>
+
+  <!-- Modified products list -->
+  <div class="card">
+    <div class="sec">📝 Cambios registrados <span id="changesCount" style="color:var(--g)">0</span></div>
+    <div class="filter-row">
+      <button class="f-btn on" id="cfAll" onclick="setCF('all')">Todos</button>
+      <button class="f-btn" id="cfNew" onclick="setCF('new')" style="--on:var(--g)">Nuevos</button>
+      <button class="f-btn w" id="cfMod" onclick="setCF('mod')">Modificados</button>
+    </div>
+    <div id="changesList" class="prod-list"></div>
+    <button class="btn btn-b" style="margin-top:10px" onclick="exportChanges()">↓ Exportar Excel con cambios</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 2: AGREGAR BARCODE A PRODUCTO EXISTENTE
+════════════════════════════════════ -->
+<div class="panel" id="tab-barcode">
+
+  <div class="card">
+    <div class="sec">🔍 Buscar producto por código interno</div>
+    <div class="search-wrap">
+      <span class="si">🔍</span>
+      <input id="bcSearch" placeholder="Escribe código o nombre..." oninput="searchForBarcode()">
+    </div>
+    <div id="bcResults" class="prod-list"></div>
+  </div>
+
+  <!-- Selected product to edit -->
+  <div class="card" id="bcEditCard" style="display:none">
+    <div class="sec">✏️ Editar producto seleccionado</div>
+    <div id="bcEditName" style="font-size:14px;font-weight:700;color:var(--g);margin-bottom:4px"></div>
+    <div id="bcEditCode" style="font-size:10px;color:var(--m);margin-bottom:10px"></div>
+
+    <div class="inp-label">Código de barras (nuevo o corrección)</div>
+    <input class="inp" id="bcNewBarcode" placeholder="Escanea o escribe el EAN...">
+    <div class="inp-label">Código interno (si deseas actualizar)</div>
+    <input class="inp" id="bcNewCode" placeholder="Código interno...">
+    <div class="inp-label">Notas del cambio</div>
+    <input class="inp" id="bcNote" placeholder="Ej: Código actualizado por proveedor">
+    <button class="btn btn-g" onclick="saveBarcodeEdit()">💾 Guardar cambio</button>
+    <button class="btn btn-o" onclick="cancelBcEdit()">Cancelar</button>
+  </div>
+
+  <div class="card">
+    <div class="sec">📋 Historial de correcciones <span id="bcHistCount" style="color:var(--g)">0</span></div>
+    <div id="bcHistList" class="prod-list"></div>
+    <button class="btn btn-b" onclick="exportBarcodeChanges()">↓ Exportar correcciones</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     TAB 3: COMPARAR CON CATÁLOGO PROVEEDOR
+════════════════════════════════════ -->
+<div class="panel" id="tab-catalogo">
+
+  <div class="card">
+    <div class="sec">1️⃣ Tu inventario actual</div>
+    <div id="catInvStatus">
+      <div class="drop" id="dropCatInv">
+        <div class="drop-icon">📦</div>
+        <div class="drop-title">Tu inventario</div>
+        <div class="drop-sub">.xlsx .xls .csv</div>
+        <input type="file" id="fileCatInv" accept=".xlsx,.xls,.csv">
+      </div>
+    </div>
+    <div id="catInvLoaded" style="display:none;color:var(--g);font-size:12px;font-weight:700"></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">2️⃣ Catálogo del proveedor</div>
+    <div id="catSupStatus">
+      <div class="drop" id="dropCatSup">
+        <div class="drop-icon">🏭</div>
+        <div class="drop-title">Catálogo proveedor</div>
+        <div class="drop-sub">.xlsx .xls .csv</div>
+        <input type="file" id="fileCatSup" accept=".xlsx,.xls,.csv">
+      </div>
+    </div>
+    <div id="catSupLoaded" style="display:none;color:var(--b2);font-size:12px;font-weight:700"></div>
+  </div>
+
+  <button class="btn btn-g" id="btnCompare" onclick="runComparison()" style="display:none">
+    🔍 Comparar ahora
+  </button>
+
+  <!-- Results -->
+  <div id="compareResults" style="display:none">
+
+    <div class="stat-grid">
+      <div class="stat-card pu"><div class="stat-big" id="cTotal">0</div><div class="stat-lbl">En catálogo</div></div>
+      <div class="stat-card g"><div class="stat-big" id="cHave">0</div><div class="stat-lbl">Ya tienes</div></div>
+      <div class="stat-card d"><div class="stat-big" id="cMissing">0</div><div class="stat-lbl">Te faltan</div></div>
+      <div class="stat-card w"><div class="stat-big" id="cPct">0%</div><div class="stat-lbl">Cobertura</div></div>
+    </div>
+
+    <div style="background:var(--s2);border-radius:10px;height:7px;margin-bottom:14px;overflow:hidden">
+      <div id="cProgBar" style="background:linear-gradient(90deg,var(--g),var(--b2));height:7px;border-radius:10px;width:0;transition:.5s"></div>
+    </div>
+
+    <div class="filter-row">
+      <button class="f-btn on" id="cfCAll" onclick="setCatF('all')">Todos</button>
+      <button class="f-btn d" id="cfCMiss" onclick="setCatF('missing')">Faltan</button>
+      <button class="f-btn" id="cfCHave" onclick="setCatF('have')">Tienes</button>
+    </div>
+
+    <div class="search-wrap">
+      <span class="si">🔍</span>
+      <input id="catSearch" placeholder="Buscar en catálogo..." oninput="renderCatResults()">
+    </div>
+
+    <div id="catResultsList" class="prod-list"></div>
+
+    <button class="btn btn-b" style="margin-top:12px" onclick="exportMissingList()">↓ Exportar lista de faltantes</button>
+    <button class="btn btn-w" style="margin-top:6px" onclick="exportFullComparison()">↓ Exportar comparación completa</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════
+// STATE
+// ══════════════════════════════════
+const LS_INV_KEY  = 'audit_inv_v3';   // shared with main app
+const LS_CHANGES  = 'gestion_changes_v1';
+const LS_BC_HIST  = 'gestion_bc_hist_v1';
+
+let baseInv   = {};   // loaded from Excel or shared LS
+let changes   = [];   // {type:'new'|'modified', product, timestamp, note}
+let bcHistory = [];   // {key, oldBarcode, newBarcode, oldCode, newCode, note, ts}
+let catInv    = {};   // user's inventory for comparison
+let catSup    = [];   // supplier catalog
+let catFilter = 'all';
+let chFilter  = 'all';
+let bcSelected = null; // key of product being edited
+let compData  = [];   // comparison results
+
+let toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (type||'ok');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.className='toast', 2600);
+}
+
+function goTab(t) {
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(el=>el.classList.remove('on'));
+  const tabs=['nuevos','barcode','catalogo'];
+  document.querySelectorAll('.tab')[tabs.indexOf(t)].classList.add('on');
+  document.getElementById('tab-'+t).classList.add('on');
+  if (t==='barcode') renderBcHistory();
+  if (t==='catalogo') checkCompareBtn();
+}
+window.goTab = goTab;
+
+// ══════════════════════════════════
+// INIT: load shared inventory + saved changes
+// ══════════════════════════════════
+function init() {
+  // Load changes
+  try { const c=localStorage.getItem(LS_CHANGES); if(c) changes=JSON.parse(c); } catch(e) {}
+  try { const b=localStorage.getItem(LS_BC_HIST); if(b) bcHistory=JSON.parse(b); } catch(e) {}
+
+  // Try to load base inventory from main app
+  try {
+    const si = localStorage.getItem(LS_INV_KEY);
+    if (si) {
+      baseInv = JSON.parse(si);
+      const count = Object.keys(baseInv).length;
+      if (count > 0) {
+        document.getElementById('dropInv').style.display = 'none';
+        document.getElementById('invStatus').style.display = '';
+        document.getElementById('invStatusTxt').textContent = '✓ ' + count + ' productos desde Auditoría';
+        catInv = {...baseInv};
+        document.getElementById('catInvStatus').innerHTML =
+          '<div style="color:var(--g);font-size:12px;font-weight:700">✓ ' + count + ' productos desde Auditoría</div>';
+      }
+    }
+  } catch(e) {}
+
+  renderChangesList();
+  renderBcHistory();
+}
+
+// ══════════════════════════════════
+// FILE READING UTILS
+// ══════════════════════════════════
+function readXLSX(file, cb) {
+  if (typeof XLSX === 'undefined') {
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=()=>readXLSX(file,cb);
+    document.head.appendChild(s); return;
+  }
+  const r=new FileReader();
+  r.onload=function(e) {
+    try {
+      let data;
+      if (file.name.endsWith('.csv')) {
+        const wb=XLSX.read(new TextDecoder('utf-8').decode(e.target.result),{type:'string'});
+        data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      } else {
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      }
+      cb(null, data);
+    } catch(ex) { cb(ex); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function findHRow(data) {
+  let best=0,score=0;
+  for (let i=0;i<Math.min(data.length,15);i++) {
+    const row=data[i].map(String);
+    const ne=row.filter(c=>c.trim()).length;
+    const kw=row.filter(c=>/cod|nom|desc|cant|id|ean|barr|precio|venta|denominac/i.test(c)).length;
+    const sc=ne+kw*3;
+    if (sc>score&&ne>=3){score=sc;best=i;}
+  }
+  return best;
+}
+
+function parseInventory(data) {
+  const hRow=findHRow(data);
+  const hdrs=data[hRow].map(String);
+  const rows=data.slice(hRow+1).filter(r=>r.some(c=>c!==''));
+  const det={};
+  const KW={barcode:/barr|ean|upc|idd/i,code:/^c.d(igo)?$|^id$/i,
+    name:/nom|desc|denominac|articulo/i,qty:/cant|qty|exist/i,
+    loc:/ubic|gandola|isla|area/i,cost:/cost|p\.cost/i,price:/venta|p\.venta/i};
+  hdrs.forEach((h,i)=>{for(const k in KW)if(!det[k]&&KW[k].test(h)){det[k]=i;}});
+  const inv={};
+  rows.forEach((row,ri)=>{
+    const b=det.barcode!=null?String(row[det.barcode]||'').trim():'';
+    const c=det.code!=null?String(row[det.code]||'').trim():'';
+    const n=det.name!=null?String(row[det.name]||'').trim():b||c;
+    const q=det.qty!=null?parseFloat(row[det.qty])||0:0;
+    const l=det.loc!=null?String(row[det.loc]||'').trim():'';
+    const co=det.cost!=null?parseFloat(row[det.cost])||0:0;
+    const pr=det.price!=null?parseFloat(row[det.price])||0:0;
+    if (!n&&!b&&!c) return;
+    const key=b||c||('_r'+ri);
+    if (!inv[key]) inv[key]={barcode:b,code:c,name:n,qty:q,loc:l,cost:co,price:pr};
+  });
+  return inv;
+}
+
+function parseCatalog(data) {
+  const hRow=findHRow(data);
+  const hdrs=data[hRow].map(String);
+  const rows=data.slice(hRow+1).filter(r=>r.some(c=>c!==''));
+  const det={};
+  const KW={barcode:/barr|ean|upc/i,code:/cod|ref|sku|id/i,
+    name:/nom|desc|denominac|articulo|product/i,
+    price:/precio|venta|pvp/i,cost:/costo|cost/i};
+  hdrs.forEach((h,i)=>{for(const k in KW)if(!det[k]&&KW[k].test(h)){det[k]=i;}});
+  return rows.map((row,ri)=>({
+    barcode: det.barcode!=null?String(row[det.barcode]||'').trim():'',
+    code:    det.code!=null?String(row[det.code]||'').trim():'',
+    name:    det.name!=null?String(row[det.name]||'').trim():'',
+    price:   det.price!=null?parseFloat(row[det.price])||0:0,
+    cost:    det.cost!=null?parseFloat(row[det.cost])||0:0,
+  })).filter(r=>r.name||r.code||r.barcode);
+}
+
+// ══════════════════════════════════
+// TAB 1: NUEVOS PRODUCTOS
+// ══════════════════════════════════
+document.getElementById('fileInv').addEventListener('change', function(e) {
+  const file=e.target.files[0]; if(!file) return;
+  readXLSX(file, (err,data)=>{
+    if (err) { toast('Error leyendo archivo','err'); return; }
+    baseInv = parseInventory(data);
+    const count=Object.keys(baseInv).length;
+    document.getElementById('dropInv').style.display='none';
+    document.getElementById('invStatus').style.display='';
+    document.getElementById('invStatusTxt').textContent='✓ '+count+' productos cargados';
+    catInv = {...baseInv};
+    toast(count+' productos cargados ✓','ok');
+    checkCompareBtn();
+  });
+});
+
+function resetInv() {
+  baseInv={};
+  document.getElementById('dropInv').style.display='';
+  document.getElementById('invStatus').style.display='none';
+  document.getElementById('fileInv').value='';
+}
+window.resetInv = resetInv;
+
+function addNewProduct() {
+  const barcode = document.getElementById('newBarcode').value.trim();
+  const code    = document.getElementById('newCode').value.trim();
+  const name    = document.getElementById('newName').value.trim();
+  const cost    = parseFloat(document.getElementById('newCost').value)||0;
+  const price   = parseFloat(document.getElementById('newPrice').value)||0;
+  const qty     = parseInt(document.getElementById('newQty').value)||0;
+  const loc     = document.getElementById('newLoc').value.trim();
+
+  if (!name) { toast('El nombre es obligatorio','err'); return; }
+
+  const prod = {barcode,code,name,cost,price,qty,loc,
+    _new:true, _ts:Date.now()};
+  changes.push({type:'new', product:prod, timestamp:Date.now()});
+  saveChanges();
+
+  // Also add to baseInv
+  const key = barcode||code||('new_'+Date.now());
+  baseInv[key] = prod;
+
+  // Clear form
+  ['newBarcode','newCode','newName','newCost','newPrice','newQty','newLoc']
+    .forEach(id=>document.getElementById(id).value='');
+
+  toast('Producto agregado ✓','ok');
+  renderChangesList();
+}
+window.addNewProduct = addNewProduct;
+
+function setCF(f) {
+  chFilter=f;
+  ['cfAll','cfNew','cfMod'].forEach(id=>document.getElementById(id).classList.remove('on','w'));
+  const el=document.getElementById(f==='all'?'cfAll':f==='new'?'cfNew':'cfMod');
+  el.classList.add('on');
+  if (f==='mod') el.classList.add('w');
+  renderChangesList();
+}
+window.setCF = setCF;
+
+function renderChangesList() {
+  document.getElementById('changesCount').textContent = changes.length;
+  const list=document.getElementById('changesList');
+  let items=changes;
+  if (chFilter==='new') items=changes.filter(c=>c.type==='new');
+  if (chFilter==='mod') items=changes.filter(c=>c.type==='modified');
+  if (!items.length) {
+    list.innerHTML='<div class="empty"><div class="empty-icon">📝</div>Sin cambios aún</div>';
+    return;
+  }
+  list.innerHTML=items.map((c,i)=>{
+    const p=c.product;
+    const ts=new Date(c.timestamp).toLocaleDateString('es');
+    return '<div class="prod-card '+(c.type==='new'?'new':'modified')+'">'
+      +'<div class="pc-top">'
+        +'<div class="pc-dot '+(c.type==='new'?'new':'modified')+'"></div>'
+        +'<div class="pc-info">'
+          +'<div class="pc-name">'+p.name+'</div>'
+          +'<div class="pc-code">'+(p.barcode||p.code||'—')+' · '+ts+'</div>'
+        +'</div>'
+        +'<span class="pc-badge '+(c.type==='new'?'new':'modified')+'">'+(c.type==='new'?'NUEVO':'MODIF.')+'</span>'
+      +'</div>'
+      +(p.cost||p.price?'<div style="font-size:10px;color:var(--m);margin-top:6px">'
+        +(p.cost?'Costo: <b style="color:var(--w)">'+p.cost+'</b> ':'')
+        +(p.price?'Precio: <b style="color:var(--g)">'+p.price+'</b>':'')
+        +'</div>':'')
+      +'<button onclick="removeChange('+i+')" style="margin-top:8px;background:transparent;'
+        +'border:1px solid var(--d);color:var(--d);border-radius:6px;padding:4px 10px;'
+        +'font-family:inherit;font-size:9px;cursor:pointer">✕ Quitar</button>'
+    +'</div>';
+  }).join('');
+}
+
+function removeChange(i) {
+  changes.splice(i,1);
+  saveChanges();
+  renderChangesList();
+}
+window.removeChange = removeChange;
+
+function saveChanges() {
+  try { localStorage.setItem(LS_CHANGES, JSON.stringify(changes)); } catch(e) {}
+}
+
+function exportChanges() {
+  if (typeof XLSX==='undefined') { toast('Librería no cargada','err'); return; }
+  const allProds = {...baseInv};
+  // Apply changes on top
+  changes.forEach(c=>{
+    if (c.type==='new') {
+      const k=c.product.barcode||c.product.code||('new_'+c.timestamp);
+      allProds[k]=c.product;
+    }
+  });
+  const rows=[['Código Barra','Código Interno','Nombre','Cantidad','Costo','Precio','Ubicación','Estado','Fecha Cambio']];
+  // Original products
+  Object.values(baseInv).forEach(v=>{
+    if (!v._new) rows.push([v.barcode,v.code,v.name,v.qty,v.cost,v.price,v.loc,'ORIGINAL','']);
+  });
+  // New products
+  changes.filter(c=>c.type==='new').forEach(c=>{
+    const p=c.product;
+    rows.push([p.barcode,p.code,p.name,p.qty,p.cost,p.price,p.loc,'NUEVO',new Date(c.timestamp).toLocaleDateString('es')]);
+  });
+  // Barcode corrections
+  bcHistory.forEach(h=>{
+    const p=baseInv[h.key];
+    if (p) rows.push([h.newBarcode||p.barcode,h.newCode||p.code,p.name,p.qty,p.cost,p.price,p.loc,'BARCODE CORREGIDO',new Date(h.ts).toLocaleDateString('es')]);
+  });
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Inventario+Cambios');
+
+  // Second sheet: only changes
+  const chRows=[['Tipo','Código Barra','Código Interno','Nombre','Cantidad','Costo','Precio','Fecha']];
+  changes.forEach(c=>{
+    const p=c.product;
+    chRows.push([c.type==='new'?'NUEVO':'MODIFICADO',p.barcode,p.code,p.name,p.qty,p.cost,p.price,new Date(c.timestamp).toLocaleDateString('es')]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(chRows),'Solo Cambios');
+
+  XLSX.writeFile(wb,'inventario_actualizado_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado ✓','ok');
+}
+window.exportChanges = exportChanges;
+
+// ══════════════════════════════════
+// TAB 2: BARCODE EDITOR
+// ══════════════════════════════════
+function searchForBarcode() {
+  const q=document.getElementById('bcSearch').value.toLowerCase().trim();
+  const list=document.getElementById('bcResults');
+  const src = Object.keys(baseInv).length ? baseInv : {};
+  if (!q) { list.innerHTML=''; return; }
+  const items=Object.entries(src).filter(([k,v])=>
+    v.name.toLowerCase().includes(q)||
+    (v.code&&v.code.toLowerCase().includes(q))||
+    (v.barcode&&v.barcode.includes(q))
+  ).slice(0,10);
+  if (!items.length) {
+    list.innerHTML='<div class="empty" style="padding:16px">Sin resultados</div>'; return;
+  }
+  list.innerHTML=items.map(([k,v])=>
+    '<div class="prod-card" style="cursor:pointer" onclick="selectForBcEdit(\''+k.replace(/'/g,"\\'")+'\')"> '
+      +'<div class="pc-top">'
+        +'<div class="pc-dot ok"></div>'
+        +'<div class="pc-info">'
+          +'<div class="pc-name">'+v.name+'</div>'
+          +'<div class="pc-code">Barcode: '+(v.barcode||'—')+' · Cod: '+(v.code||'—')+'</div>'
+        +'</div>'
+        +'<div style="font-size:18px">→</div>'
+      +'</div>'
+    +'</div>'
+  ).join('');
+}
+window.searchForBarcode = searchForBarcode;
+
+function selectForBcEdit(key) {
+  const src = Object.keys(baseInv).length ? baseInv : {};
+  const prod=src[key]; if (!prod) return;
+  bcSelected=key;
+  document.getElementById('bcEditCard').style.display='';
+  document.getElementById('bcEditName').textContent=prod.name;
+  document.getElementById('bcEditCode').textContent='Barcode: '+(prod.barcode||'—')+' · Código: '+(prod.code||'—');
+  document.getElementById('bcNewBarcode').value=prod.barcode||'';
+  document.getElementById('bcNewCode').value=prod.code||'';
+  document.getElementById('bcNote').value='';
+  document.getElementById('bcResults').innerHTML='';
+  document.getElementById('bcSearch').value='';
+  window.scrollTo(0,document.getElementById('bcEditCard').offsetTop-60);
+}
+window.selectForBcEdit = selectForBcEdit;
+
+function saveBarcodeEdit() {
+  if (!bcSelected) return;
+  const src = Object.keys(baseInv).length ? baseInv : {};
+  const prod=src[bcSelected]; if (!prod) return;
+  const newBarcode=document.getElementById('bcNewBarcode').value.trim();
+  const newCode=document.getElementById('bcNewCode').value.trim();
+  const note=document.getElementById('bcNote').value.trim();
+
+  const hist={
+    key:bcSelected,
+    prodName:prod.name,
+    oldBarcode:prod.barcode,
+    newBarcode:newBarcode,
+    oldCode:prod.code,
+    newCode:newCode,
+    note,
+    ts:Date.now()
+  };
+  bcHistory.push(hist);
+  try { localStorage.setItem(LS_BC_HIST,JSON.stringify(bcHistory)); } catch(e) {}
+
+  // Update in baseInv
+  if (newBarcode) prod.barcode=newBarcode;
+  if (newCode) prod.code=newCode;
+
+  // Also update changes log
+  changes.push({type:'modified', product:{...prod}, timestamp:Date.now(), note:'Barcode/código actualizado'});
+  saveChanges();
+
+  toast('Cambio guardado ✓','ok');
+  cancelBcEdit();
+  renderBcHistory();
+  renderChangesList();
+}
+window.saveBarcodeEdit = saveBarcodeEdit;
+
+function cancelBcEdit() {
+  bcSelected=null;
+  document.getElementById('bcEditCard').style.display='none';
+}
+window.cancelBcEdit = cancelBcEdit;
+
+function renderBcHistory() {
+  document.getElementById('bcHistCount').textContent=bcHistory.length;
+  const list=document.getElementById('bcHistList');
+  if (!bcHistory.length) {
+    list.innerHTML='<div class="empty"><div class="empty-icon">🔢</div>Sin correcciones aún</div>'; return;
+  }
+  list.innerHTML=[...bcHistory].reverse().map((h,i)=>{
+    const ts=new Date(h.ts).toLocaleDateString('es');
+    return '<div class="prod-card modified">'
+      +'<div class="pc-name">'+h.prodName+'</div>'
+      +'<div class="pc-code" style="margin-top:4px">'
+        +'Antes: '+(h.oldBarcode||'—')+' → Ahora: <b style="color:var(--g)">'+(h.newBarcode||'—')+'</b>'
+      +'</div>'
+      +(h.oldCode!==h.newCode?'<div class="pc-code">Código: '+(h.oldCode||'—')+' → <b style="color:var(--b2)">'+(h.newCode||'—')+'</b></div>':'')
+      +(h.note?'<div class="pc-code" style="color:var(--w)">📝 '+h.note+'</div>':'')
+      +'<div class="pc-code">'+ts+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function exportBarcodeChanges() {
+  if (!bcHistory.length) { toast('Sin correcciones para exportar','err'); return; }
+  const rows=[['Producto','Barcode Anterior','Barcode Nuevo','Código Anterior','Código Nuevo','Nota','Fecha']];
+  bcHistory.forEach(h=>rows.push([h.prodName,h.oldBarcode,h.newBarcode,h.oldCode,h.newCode,h.note,new Date(h.ts).toLocaleDateString('es')]));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Correcciones Barcode');
+  XLSX.writeFile(wb,'correcciones_barcode_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado ✓','ok');
+}
+window.exportBarcodeChanges = exportBarcodeChanges;
+
+// ══════════════════════════════════
+// TAB 3: COMPARAR CATÁLOGO
+// ══════════════════════════════════
+document.getElementById('fileCatInv').addEventListener('change',function(e){
+  const file=e.target.files[0]; if(!file) return;
+  readXLSX(file,(err,data)=>{
+    if(err){toast('Error','err');return;}
+    catInv=parseInventory(data);
+    const n=Object.keys(catInv).length;
+    document.getElementById('catInvStatus').innerHTML='<div style="color:var(--g);font-size:12px;font-weight:700">✓ '+n+' productos en tu inventario</div>';
+    toast(n+' productos cargados','ok');
+    checkCompareBtn();
+  });
+});
+
+document.getElementById('fileCatSup').addEventListener('change',function(e){
+  const file=e.target.files[0]; if(!file) return;
+  readXLSX(file,(err,data)=>{
+    if(err){toast('Error','err');return;}
+    catSup=parseCatalog(data);
+    document.getElementById('catSupStatus').innerHTML='<div style="color:var(--b2);font-size:12px;font-weight:700">✓ '+catSup.length+' productos en catálogo proveedor</div>';
+    toast(catSup.length+' productos del catálogo','ok');
+    checkCompareBtn();
+  });
+});
+
+function checkCompareBtn() {
+  const hasInv=Object.keys(catInv).length>0||Object.keys(baseInv).length>0;
+  const hasSup=catSup.length>0;
+  document.getElementById('btnCompare').style.display=(hasInv&&hasSup)?'':'none';
+}
+
+function runComparison() {
+  const myInv = Object.keys(catInv).length ? catInv : baseInv;
+  if (!Object.keys(myInv).length||!catSup.length) { toast('Carga ambos archivos primero','err'); return; }
+
+  // Build lookup for my inventory: barcode, code, name fragments
+  const myBarcodes=new Set(Object.values(myInv).map(v=>v.barcode).filter(Boolean));
+  const myCodes=new Set(Object.values(myInv).map(v=>v.code.toLowerCase()).filter(Boolean));
+  const myNames=Object.values(myInv).map(v=>v.name.toLowerCase());
+
+  compData = catSup.map(item=>{
+    const bc=item.barcode, cd=item.code.toLowerCase(), nm=item.name.toLowerCase();
+    let status='missing';
+    // Check if I have it
+    if (bc&&myBarcodes.has(bc)) status='have';
+    else if (cd&&myCodes.has(cd)) status='have';
+    else if (nm&&myNames.some(n=>n.includes(nm)||nm.includes(n.slice(0,15)))) status='have';
+    return {...item, status};
+  });
+
+  const total=compData.length;
+  const have=compData.filter(d=>d.status==='have').length;
+  const missing=compData.filter(d=>d.status==='missing').length;
+  const pct=total?Math.round(have/total*100):0;
+
+  document.getElementById('cTotal').textContent=total;
+  document.getElementById('cHave').textContent=have;
+  document.getElementById('cMissing').textContent=missing;
+  document.getElementById('cPct').textContent=pct+'%';
+  document.getElementById('cProgBar').style.width=pct+'%';
+  document.getElementById('compareResults').style.display='';
+  catFilter='all';
+  setCatF('missing'); // default to show missing
+  toast('Comparación lista ✓','ok');
+  window.scrollTo(0,document.getElementById('compareResults').offsetTop-60);
+}
+window.runComparison = runComparison;
+
+function setCatF(f) {
+  catFilter=f;
+  ['cfCAll','cfCMiss','cfCHave'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.classList.remove('on','d');
+  });
+  const el=document.getElementById(f==='all'?'cfCAll':f==='missing'?'cfCMiss':'cfCHave');
+  el.classList.add('on');
+  if (f==='missing') el.classList.add('d');
+  renderCatResults();
+}
+window.setCatF = setCatF;
+
+function renderCatResults() {
+  const q=document.getElementById('catSearch').value.toLowerCase();
+  const list=document.getElementById('catResultsList');
+  let items=compData;
+  if (catFilter==='missing') items=items.filter(d=>d.status==='missing');
+  if (catFilter==='have') items=items.filter(d=>d.status==='have');
+  if (q) items=items.filter(d=>d.name.toLowerCase().includes(q)||(d.code&&d.code.toLowerCase().includes(q))||(d.barcode&&d.barcode.includes(q)));
+
+  if (!items.length) { list.innerHTML='<div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div>'; return; }
+
+  list.innerHTML=items.slice(0,50).map(d=>
+    '<div class="prod-card '+(d.status==='have'?'ok':'missing')+'">'
+      +'<div class="pc-top">'
+        +'<div class="pc-dot '+(d.status==='have'?'ok':'missing')+'"></div>'
+        +'<div class="pc-info">'
+          +'<div class="pc-name">'+d.name+'</div>'
+          +'<div class="pc-code">'+(d.barcode||d.code||'—')+(d.price?' · S/ '+d.price:'')+'</div>'
+        +'</div>'
+        +'<span class="tag '+(d.status==='have'?'yes':'no')+'">'+(d.status==='have'?'TIENES':'FALTA')+'</span>'
+      +'</div>'
+    +'</div>'
+  ).join('')+(items.length>50?'<div class="empty">... y '+(items.length-50)+' más</div>':'');
+}
+window.renderCatResults = renderCatResults;
+
+function exportMissingList() {
+  const missing=compData.filter(d=>d.status==='missing');
+  if (!missing.length) { toast('No hay faltantes','err'); return; }
+  const rows=[['Código Barra','Código','Nombre','Precio Proveedor','Costo','Estado']];
+  missing.forEach(d=>rows.push([d.barcode,d.code,d.name,d.price,d.cost,'FALTA EN INVENTARIO']));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Productos Faltantes');
+  XLSX.writeFile(wb,'faltantes_catalogo_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado '+missing.length+' faltantes ✓','ok');
+}
+window.exportMissingList = exportMissingList;
+
+function exportFullComparison() {
+  const rows=[['Código Barra','Código','Nombre','Precio','Estado','Tienes']];
+  compData.forEach(d=>rows.push([d.barcode,d.code,d.name,d.price,d.status==='have'?'TIENES':'FALTA',d.status==='have'?'SÍ':'NO']));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Comparación Catálogo');
+  XLSX.writeFile(wb,'comparacion_catalogo_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Exportado ✓','ok');
+}
+window.exportFullComparison = exportFullComparison;
+
+// ══════════════════════════════════
+// INIT
+// ══════════════════════════════════
+init();
+</script>
+</body>
+</html>
